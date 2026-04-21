@@ -17,7 +17,7 @@ class LoginRepoImplement implements LogInRepo {
   }) async {
     try {
       final response = await apiService.post(
-        endpoint: "/email/login",
+        endpoint: "/users/login",
         data: {"email": email, "password": password},
       );
 

@@ -16,52 +16,61 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-Future <void> main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  bool loggedIn = await LocalStorage.isUserLoggedIn();
-    final token = await LocalStorage.getToken();
 
-  runApp(MyApp(loggedIn: token!=null&&token.isNotEmpty));
+  bool loggedIn = await LocalStorage.isUserLoggedIn();
+  final token = await LocalStorage.getToken();
+
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: "http://192.168.1.2:5000/api/v1",
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
+
+  final apiService = ApiService(dio);
+
+  try {
+    final response = await dio.get("/");
+    print("✅ API Connected: ${response.data}");
+  } catch (e) {
+    print("❌ API Error: $e");
+  }
+
+  runApp(
+    MyApp(loggedIn: token != null && token.isNotEmpty, apiService: apiService),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  final bool loggedIn; // Storing login state
+  final bool loggedIn;
+  final ApiService apiService;
 
-  const MyApp({super.key, required this.loggedIn});
+  const MyApp({super.key, required this.loggedIn, required this.apiService});
 
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<SigninRepo>(
-          create: (_) => SigninRepoImplement(ApiService(Dio())),
+          create: (_) => SigninRepoImplement(apiService),
         ),
         RepositoryProvider<LogInRepo>(
-          create: (_) => LoginRepoImplement(ApiService(Dio())),
+          create: (_) => LoginRepoImplement(apiService),
         ),
-
         RepositoryProvider<StationRepo>(
-          create: (_) => StationRepoImplement(ApiService(Dio())),
-        ),
-
-        BlocProvider<SettingsCubit>(create: (_) => SettingsCubit()),
-
-        BlocProvider<SeatSelectionCubit>(create: (_) => SeatSelectionCubit()),
-
-        BlocProvider<HomeCubit>(
-          create: (context) => HomeCubit(context.read<StationRepo>()),
+          create: (_) => StationRepoImplement(apiService),
         ),
       ],
       child: MultiBlocProvider(
         providers: [
-          RepositoryProvider<SigninRepo>(
-            create: (_) => SigninRepoImplement(ApiService(Dio())),
-          ),
-          RepositoryProvider<LogInRepo>(
-            create: (_) => LoginRepoImplement(ApiService(Dio())),
-          ),
           BlocProvider<SettingsCubit>(create: (_) => SettingsCubit()),
           BlocProvider<SeatSelectionCubit>(create: (_) => SeatSelectionCubit()),
+          BlocProvider<HomeCubit>(
+            create: (context) => HomeCubit(context.read<StationRepo>()),
+          ),
         ],
         child: BlocBuilder<SettingsCubit, SettingsState>(
           builder: (context, state) {
@@ -69,8 +78,6 @@ class MyApp extends StatelessWidget {
 
             return MaterialApp(
               debugShowCheckedModeBanner: false,
-
-              /// Language
               locale: cubit.locale,
               supportedLocales: const [Locale('en'), Locale('ar')],
               localizationsDelegates: const [
@@ -78,8 +85,6 @@ class MyApp extends StatelessWidget {
                 GlobalWidgetsLocalizations.delegate,
                 GlobalCupertinoLocalizations.delegate,
               ],
-
-              /// Theme
               themeMode: cubit.themeMode,
               theme: ThemeData(
                 brightness: Brightness.light,
@@ -101,7 +106,6 @@ class MyApp extends StatelessWidget {
                   bodyLarge: TextStyle(color: Colors.white),
                 ),
               ),
-
               home: loggedIn ? const HomeView() : const CreateAccount(),
             );
           },
@@ -110,4 +114,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-  //  home: loggedIn ? const HomePage() : const CreateAccount(),
